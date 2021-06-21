@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "service";
+option java_outer_classname = "ServiceProto";
+option objc_class_prefix = "SP";
+
+package service;
+
+// The conversion service definition.
+service TaskService {
+    rpc createTask (CreateTaskRequest) returns (CreateTaskResponse);
+    rpc completeTask (CompleteTaskRequest) returns (CompleteTaskResponse);
+}
+
+message ErrorMessage {
+    int32 code = 1;
+    string message = 2;
+}
+
+message CreateTaskResponse {
+    bool success = 1;
+    oneof value {
+        ErrorMessage error = 2;
+        int32 task_id = 3;
+    }
+}
+
+message CompleteTaskResponse {
+    bool success = 1;
+    oneof value {
+        ErrorMessage error = 2;
+    }
+}
+
+message Task {
+    string description = 1;
+    bool important = 2;
+    bool private = 3;
+    string project = 4;
+    string deadline = 5;
+    bool completed = 6;
+    repeated User assignees = 7;
+}
+
+message Credentials {
+    string username = 1;
+    string password = 2;
+}
+
+message CreateTaskRequest {
+    Credentials credentials = 1;
+    Task task = 2;
+}
+
+message CompleteTaskRequest {
+    Credentials credentials = 1;
+    int32 task_id = 2;
+}
+
+message User {
+    string name = 1;
+    string email = 2;
+    int32 id = 3;
+    string password = 4;
+}
