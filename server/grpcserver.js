@@ -11,10 +11,11 @@ const taskService = require("./service/TasksService.js");
 
 const PROTO_PATH = "./protos/rpc-service.proto";
 
-const _ERR_CODES = {
-    INVALID_EMAIL: 1,
-    INVALID_PASSWORD: 2,
-    INVALID_QUERY_PARAM: 3,
+const _ERROR_CODES = {
+    INVALID_CREDENTIALS: 100,
+    ENTITY_NOT_FOUND: 101,
+    BAD_REQUEST: 200,
+    INTERNAL_SERVER_ERROR: 201,
 };
 
 /**
@@ -49,7 +50,12 @@ function startServer() {
     const hostname = `${config.grpc.host}:${config.grpc.port}`;
     const credentials = grpc.ServerCredentials.createSsl(
         null,
-        [{ cert_chain: fs.readFileSync("./localhost.pem"), private_key: fs.readFileSync("./key.pem") }],
+        [
+            {
+                cert_chain: fs.readFileSync("./localhost.pem"),
+                private_key: fs.readFileSync("./key.pem"),
+            },
+        ],
         false
     );
 
@@ -65,33 +71,39 @@ function startServer() {
     });
 }
 
-function sanitizeTaskMessage(taskMessage) {
+function _sanitizeTaskMessage(taskMessage) {
     const taskMessageCopy = { ...taskMessage };
     if (taskMessageCopy.deadline === "") taskMessageCopy.deadline = null;
     if (taskMessageCopy.project === "") taskMessageCopy.project = null;
     return taskMessageCopy;
 }
 
-function validateTaskMessage(taskMessage) {
+function _validateTaskMessage(taskMessage) {
     const errors = [];
     if (taskMessage.description === "") {
-        errors.push({ dataPath: "description", message: "should be a non-empty string" });
+        errors.push({
+            dataPath: "description",
+            message: "should be a non-empty string",
+        });
     }
     if (taskMessage.deadline !== "" && !DateTime.fromISO(taskMessage.deadline).isValid) {
-        errors.push({ dataPath: "deadline", message: "should a ISO 8601 compliant datetime" });
+        errors.push({
+            dataPath: "deadline",
+            message: "should a ISO 8601 compliant datetime",
+        });
     }
 
     return errors;
 }
 
-function validateThenSanitizeTaskMessage(message) {
-    const errors = validateTaskMessage(message);
+function _validateThenSanitizeTaskMessage(message) {
+    const errors = _validateTaskMessage(message);
 
     if (errors.length != 0) return { errors };
-    else return { value: sanitizeTaskMessage(message) };
+    else return { value: _sanitizeTaskMessage(message) };
 }
 
-async function doUsersExists(users) {
+async function _findUsers(users) {
     const promises = [];
     const findBy = [];
 
@@ -109,9 +121,14 @@ async function doUsersExists(users) {
     const usersNotFound = Array.from(allUsers, (_, idx) => idx)
         .filter((idx) => allUsers[idx] === undefined)
         .map((idx) => findBy[idx]);
-
+    
     return [allUsers, usersNotFound];
 }
+
+// function sendResponse(res, success, { error, response } = {}) {
+//     if (success) res(null, { success, ...response });
+//     else return res(null, { success, error });
+// }
 
 async function createTaskHandler(call, callback) {
     console.log("grpc server: received request for createTaskHandler");
@@ -121,14 +138,26 @@ async function createTaskHandler(call, callback) {
         call.request.credentials.password
     );
 
-    if (!success) return callback(null, { success: false, error: { code: 1, message: "invalid credentials" } });
+    if (!success) {
+        callback(null, {
+            success: false,
+            error: { code: _ERROR_CODES.INVALID_CREDENTIALS, message: "invalid credentials" },
+        });
+    }
 
-    const { value: taskToAdd, errors } = validateThenSanitizeTaskMessage(call.request.task);
-    if (errors) return callback(null, { success: false, error: { message: JSON.stringify(errors) } });
+    const { value: taskToAdd, errors } = _validateThenSanitizeTaskMessage(call.request.task);
+    if (errors)
+        return callback(null, {
+            success: false,
+            error: { code:_ERROR_CODES.BAD_REQUEST, message: JSON.stringify(errors) },
+        });
 
-    const [users, usersNotFound] = await doUsersExists(call.request.task.assignees);
+    const [users, usersNotFound] = await _findUsers(call.request.task.assignees);
     if (usersNotFound.length > 0)
-        return callback(null, { success: false, error: { message: "users not found: " + usersNotFound.join(", ") } });
+        return callback(null, {
+            success: false,
+            error: { code: _ERROR_CODES.ENTITY_NOT_FOUND, message: "users not found: " + usersNotFound.join(", ") },
+        });
 
     // ignore duplicate user ids
     const userIds = [...new Set(users.map((user) => user.id))];
@@ -137,8 +166,10 @@ async function createTaskHandler(call, callback) {
         const createdTask = await taskService.addTaskWithAssignees(taskToAdd, userIds);
         callback(null, { success: true, task_id: createdTask.id });
     } catch (err) {
-        console.log(err);
-        callback(null, { success: false, error: { message: "internal server error" } });
+        callback(null, {
+            success: false,
+            error: { code: _ERROR_CODES.INTERNAL_SERVER_ERROR, message: "internal server error" },
+        });
     }
 }
 
@@ -148,17 +179,27 @@ async function completeTaskHandler(call, callback) {
         call.request.credentials.username,
         call.request.credentials.password
     );
-    if (!success) return callback(null, { success: false, error: { code: 1, message: "invalid credentials" } });
+    if (!success)
+        return callback(null, {
+            success: false,
+            error: { code: _ERROR_CODES.INVALID_CREDENTIALS, message: "invalid credentials" },
+        });
 
     try {
         const result = await taskService.updateSingleTask({ completed: true }, call.request.task_id);
         if (result === "not_found") {
-            callback(null, { success: false, error: { message: `task ${call.request.task_id} not found` } });
+            callback(null, {
+                success: false,
+                error: { code: _ERROR_CODES.ENTITY_NOT_FOUND, message: `task ${call.request.task_id} not found` },
+            });
         } else {
             callback(null, { success: true });
         }
     } catch (err) {
-        callback(null, { success: false, error: { message: "server internal error" } });
+        callback(null, {
+            success: false,
+            error: { code: _ERROR_CODES.INTERNAL_SERVER_ERROR, message: "internal server error" },
+        });
     }
 }
 
