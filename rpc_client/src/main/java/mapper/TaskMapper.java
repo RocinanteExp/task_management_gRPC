@@ -20,7 +20,7 @@ public class TaskMapper {
         }
     }
 
-    public static void setTaskField(Task.Builder taskBuilder, String name, Object value) {
+    private static void setTaskField(Task.Builder taskBuilder, String name, Object value) {
         switch (name) {
             case "description":
                 taskBuilder.setDescription((String) value);
@@ -55,7 +55,6 @@ public class TaskMapper {
         return userBuilder.build();
     }
 
-    //    public static Task createMessageTaskFromJsonObj(JSONObject jsonObj) {
     public static Task fromJSONObjToTaskMessage(JSONObject jsonObj) {
         Task.Builder taskBuilder = Task.newBuilder();
         jsonObj.keySet().forEach(keyStr -> setTaskField(taskBuilder, keyStr, jsonObj.get(keyStr)));
