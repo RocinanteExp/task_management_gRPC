@@ -1,17 +1,20 @@
 "use strict";
 
 const WebSocket = require("ws");
-const WSMessage = require("./ws_message.js");
+const config = require("../config.js");
+// const WSMessage = require("./ws_message.js");
 const loginMessagesMap = new Map();
 
-const wss = new WebSocket.Server({ port: 5000 });
+module.exports.startServer = function startServer(port = config.wss.port) {
+    const wss = new WebSocket.Server({ port });
 
-wss.on("connection", (ws) => {
-    //inform the newly connected client about all the users who are currently logged in the service
-    loginMessagesMap.forEach(function each(message) {
-        ws.send(JSON.stringify(message));
+    wss.on("connection", (ws) => {
+        //inform the newly connected client about all the users who are currently logged in the service
+        loginMessagesMap.forEach(function each(message) {
+            ws.send(JSON.stringify(message));
+        });
     });
-});
+};
 
 module.exports.sendAllClients = function sendAllClients(message) {
     wss.clients.forEach(function each(client) {
