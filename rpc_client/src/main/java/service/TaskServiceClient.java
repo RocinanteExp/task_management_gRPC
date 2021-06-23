@@ -11,31 +11,45 @@ import org.everit.json.schema.loader.SchemaLoader;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import javax.net.ssl.SSLException;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 public class TaskServiceClient {
-    private static final String EMAIL = "a@a.it";
-    private static final String PASSWORD = "password";
-    private static final String HOST = "localhost";
-    private static final int PORT = 443;
-    private static final String TASK_SCHEMA_PATH = "./src/main/resources/task_schema.json";
-    private static final String CERTIFICATE_PATH = "./localhost.pem";
+    private static final String TASK_SCHEMA_PATH = "/task_schema.json";
+    private static String USERNAME;
+    private static String PASSWORD;
+    private static String HOST;
+    private static int PORT;
+    private static String CERTIFICATE_PATH;
 
-    public static ManagedChannel getChannel() throws SSLException {
-        return NettyChannelBuilder
-                .forAddress(HOST, PORT)
-                .sslContext(GrpcSslContexts.forClient().trustManager(new File(CERTIFICATE_PATH)).build())
-                .build();
+    static {
+        try (InputStream inputStream = TaskServiceClient.class.getResourceAsStream("/config.properties")) {
+            if (inputStream == null) {
+                System.err.println("config.properties file not found under the folder /resources");
+                System.exit(-10);
+            }
+            Properties props = new Properties();
+            props.load(inputStream);
+            USERNAME = props.getProperty("credentials.username");
+            PASSWORD = props.getProperty("credentials.password");
+            HOST = props.getProperty("grpcserver.host");
+            PORT = Integer.parseInt(props.getProperty("grpcserver.port"));
+            CERTIFICATE_PATH = "/" + props.getProperty("grpcserver.certificate");
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(-10);
+        }
     }
 
+    // utility method used to parse the command line arguments
     public static CommandLine parseArgs(String[] args) {
         Options options = new Options();
 
-        Option createOpt = new Option("c", "create-task", true, "create a new task given the path to a task.json");
+        Option createOpt = new Option("c", "create-task", true, "create a new task given a <task>.json");
         Option completeOpt = new Option("f", "complete-task", true, "complete a task with the given id");
 
         OptionGroup optgrp = new OptionGroup();
@@ -52,31 +66,47 @@ public class TaskServiceClient {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
             System.err.println(e.getMessage());
-            formatter.printHelp("foo", options);
-            System.exit(1);
+            formatter.printHelp("java -jar <jar file>", options);
+            System.exit(-1);
         }
 
         return cmd;
     }
 
-    public static Schema loadTaskSchema() throws FileNotFoundException {
-        JSONObject jsonSchema = new JSONObject(new JSONTokener(new FileReader(TASK_SCHEMA_PATH)));
 
-        return SchemaLoader
-                .builder()
-                .schemaClient(SchemaClient.classPathAwareClient())
-                .schemaJson(jsonSchema)
-                .resolutionScope("classpath:///")
-                .build()
-                .load()
-                .build();
+    public static ManagedChannel getChannel() throws IOException {
+        try (InputStream inputStream = TaskServiceClient.class.getResourceAsStream(CERTIFICATE_PATH)) {
+            if (inputStream == null) throw new FileNotFoundException("certificate " + CERTIFICATE_PATH + " not found");
+            return NettyChannelBuilder
+                    .forAddress(HOST, PORT)
+                    .sslContext(GrpcSslContexts.forClient().trustManager(inputStream).build())
+                    .build();
+        }
+    }
+
+    public static Schema loadTaskSchema() throws IOException {
+        try (InputStream inputStream = TaskServiceClient.class.getResourceAsStream(TASK_SCHEMA_PATH)) {
+            if (inputStream == null) throw new FileNotFoundException("task schema " + TASK_SCHEMA_PATH + " not found");
+            JSONObject jsonSchema = new JSONObject(new JSONTokener(inputStream));
+
+            return SchemaLoader
+                    .builder()
+                    .schemaClient(SchemaClient.classPathAwareClient())
+                    .schemaJson(jsonSchema)
+                    .resolutionScope("classpath:///")
+                    .build()
+                    .load()
+                    .build();
+        }
     }
 
     public static void validateJsonAgainstSchema(Schema schema, JSONObject jsonSubject) {
         schema.validate(jsonSubject);
     }
 
-    public static JSONObject getTaskJson(String path) throws FileNotFoundException {
+    // convert the json file "path" to a JSONObject
+    // it will throw an error if the json does not pass the validation against the default task schema
+    public static JSONObject getTaskJSONObject(String path) throws IOException {
         JSONObject jsonSubject = new JSONObject(new JSONTokener(new FileReader(path)));
         Schema schema = loadTaskSchema();
         validateJsonAgainstSchema(schema, jsonSubject);
@@ -91,12 +121,12 @@ public class TaskServiceClient {
             channel = getChannel();
             TaskServiceGrpc.TaskServiceBlockingStub clientStub = TaskServiceGrpc.newBlockingStub(channel);
             if (cmd.hasOption("c")) {
-                JSONObject taskJson = getTaskJson(cmd.getOptionValue("c"));
+                JSONObject taskJson = getTaskJSONObject(cmd.getOptionValue("c"));
                 Task taskMessage = TaskMapper.fromJSONObjToTaskMessage(taskJson);
 
                 CreateTaskRequest request = CreateTaskRequest
                         .newBuilder()
-                        .setCredentials(Credentials.newBuilder().setUsername(EMAIL).setPassword(PASSWORD))
+                        .setCredentials(Credentials.newBuilder().setUsername(USERNAME).setPassword(PASSWORD))
                         .setTask(taskMessage)
                         .build();
 
@@ -112,7 +142,7 @@ public class TaskServiceClient {
 
                 CompleteTaskRequest request = CompleteTaskRequest
                         .newBuilder()
-                        .setCredentials(Credentials.newBuilder().setUsername(EMAIL).setPassword(PASSWORD))
+                        .setCredentials(Credentials.newBuilder().setUsername(USERNAME).setPassword(PASSWORD))
                         .setTaskId(taskId).build();
 
                 CompleteTaskResponse response = clientStub.completeTask(request);
@@ -129,9 +159,8 @@ public class TaskServiceClient {
             System.exit(3);
         } catch (Throwable e) {
             if (e.getMessage().contains("io exception"))
-                System.err.println("could not connect to " + HOST + ":" + PORT);
+                System.err.println("could not connect to " + HOST + ":" + PORT + " (probably because the grpc server is offline)");
             else System.err.println(e.getMessage());
-            e.printStackTrace();
             System.exit(4);
         } finally {
             try {
