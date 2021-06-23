@@ -1,15 +1,19 @@
 "use strict";
 
-const config = require("./config.js");
-const grpc = require("@grpc/grpc-js");
-const protoLoader = require("@grpc/proto-loader");
-const UserController = require("./controllers/Users");
-const userService = require("./service/UsersService");
-const fs = require("fs");
 const DateTime = require("luxon").DateTime;
-const taskService = require("./service/TasksService.js");
+const fs = require("fs");
+const grpc = require("@grpc/grpc-js");
+const path = require("path");
+const protoLoader = require("@grpc/proto-loader");
 
-const PROTO_PATH = "./protos/rpc-service.proto";
+const config = require(path.join(__dirname, "configuration", "config.js"));
+const taskService = require(path.join(__dirname, "service", "TasksService.js"));
+const userController = require(path.join(__dirname, "controllers", "Users.js"));
+const userService = require(path.join(__dirname, "service", "UsersService.js"));
+
+const PROTO_PATH = path.join(__dirname, "protos", "rpc-service.proto");
+const CERTIFICATE_PATH = path.join(__dirname, "certificates", "localhost.pem");
+const ASYMMETRIC_KEYS_PATH = path.join(__dirname, "certificates", "key.pem");
 
 const _ERROR_CODES = {
     INVALID_CREDENTIALS: 100,
@@ -47,13 +51,14 @@ function _getServer(path) {
  */
 function startServer() {
     const server = _getServer(PROTO_PATH);
+    console.log(__dirname);
     const hostname = `${config.grpc.host}:${config.grpc.port}`;
     const credentials = grpc.ServerCredentials.createSsl(
         null,
         [
             {
-                cert_chain: fs.readFileSync("./localhost.pem"),
-                private_key: fs.readFileSync("./key.pem"),
+                cert_chain: fs.readFileSync(CERTIFICATE_PATH),
+                private_key: fs.readFileSync(ASYMMETRIC_KEYS_PATH),
             },
         ],
         false
@@ -121,7 +126,7 @@ async function _findUsers(users) {
     const usersNotFound = Array.from(allUsers, (_, idx) => idx)
         .filter((idx) => allUsers[idx] === undefined)
         .map((idx) => findBy[idx]);
-    
+
     return [allUsers, usersNotFound];
 }
 
@@ -133,7 +138,7 @@ async function _findUsers(users) {
 async function createTaskHandler(call, callback) {
     console.log("grpc server: received request for createTaskHandler");
     console.log(call.request);
-    const { success } = await UserController.authenticateUserWithEmailAndPassword(
+    const { success } = await userController.authenticateUserWithEmailAndPassword(
         call.request.credentials.username,
         call.request.credentials.password
     );
@@ -149,7 +154,7 @@ async function createTaskHandler(call, callback) {
     if (errors)
         return callback(null, {
             success: false,
-            error: { code:_ERROR_CODES.BAD_REQUEST, message: JSON.stringify(errors) },
+            error: { code: _ERROR_CODES.BAD_REQUEST, message: JSON.stringify(errors) },
         });
 
     const [users, usersNotFound] = await _findUsers(call.request.task.assignees);
@@ -175,7 +180,7 @@ async function createTaskHandler(call, callback) {
 
 async function completeTaskHandler(call, callback) {
     console.log("grpc server: received request for completeTaskHandler");
-    const { success } = await UserController.authenticateUserWithEmailAndPassword(
+    const { success } = await userController.authenticateUserWithEmailAndPassword(
         call.request.credentials.username,
         call.request.credentials.password
     );

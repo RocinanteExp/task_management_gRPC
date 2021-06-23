@@ -1,24 +1,25 @@
 "use strict";
 
-const path = require("path");
 const { Validator, ValidationError } = require("express-json-validator-middleware");
-const assignmentController = require("./controllers/Assignments");
-const config = require("./config.js");
 const cookieParser = require("cookie-parser");
 const fs = require("fs");
-const grpcServer = require("./grpcserver.js");
 const http = require("http");
 const jwt = require("express-jwt");
 const oas3Tools = require("oas3-tools");
-const taskController = require("./controllers/Tasks");
-const userController = require("./controllers/Users");
-const wss = require("./components/websocket");
+const path = require("path");
+
+const config = require(path.join(__dirname, "configuration", "config.js"));
+const assignmentController = require(path.join(__dirname, "controllers/Assignments.js"));
+const taskController = require(path.join(__dirname, "controllers/Tasks.js"));
+const userController = require(path.join(__dirname, "controllers/Users.js"));
+const grpcServer = require(path.join(__dirname, "grpcserver.js"));
+const wss = require(path.join(__dirname, "components/websocket.js"));
 
 const SERVER_PORT = config.rest.port;
 const JWT_SECRET = "6xvL4xkAAbG49hcXf5GIYSvkDICiUAR6EdR5dLdwW7hMzUjjMUe9t6M5kSAYxsvX";
 
 // swaggerRouter configuration
-const expressAppConfig = oas3Tools.expressAppConfig(path.join(__dirname, "api/openapi.yaml"), {
+const expressAppConfig = oas3Tools.expressAppConfig(path.join(__dirname, "api", "openapi.yaml"), {
     controllers: path.join(__dirname, "./controllers"),
 });
 expressAppConfig.addValidator();
@@ -27,8 +28,8 @@ const app = expressAppConfig.getApp();
 
 function _getDefaultValidatorHandler() {
     // Set validator middleware
-    const taskSchema = JSON.parse(fs.readFileSync(path.join(".", "json_schemas", "task_schema.json")).toString());
-    const userSchema = JSON.parse(fs.readFileSync(path.join(".", "json_schemas", "user_schema.json")).toString());
+    const taskSchema = JSON.parse(fs.readFileSync(path.join(__dirname, "json_schemas", "task_schema.json")).toString());
+    const userSchema = JSON.parse(fs.readFileSync(path.join(__dirname, "json_schemas", "user_schema.json")).toString());
     const validator = new Validator({ allErrors: true });
     //validator.ajv.addMetaSchema(require('ajv/lib/refs/json-schema-draft-07.json'));
     validator.ajv.addSchema([userSchema, taskSchema]);

@@ -1,8 +1,8 @@
 "use strict";
 
 const WebSocket = require("ws");
-const config = require("../config.js");
-// const WSMessage = require("./ws_message.js");
+const path = require("path");
+const config = require(path.join(__dirname, "..", "configuration", "config.js"));
 const loginMessagesMap = new Map();
 
 module.exports.startServer = function startServer(port = config.wss.port) {
