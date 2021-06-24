@@ -31,7 +31,7 @@
     "project": {
       "type": "string",
       "description": "project in which the task is inserted",
-      "enum": ["Personal", "WA1_Project", "WA2_Project", "DSP_Project"]
+      "enum": ["PERSONAL", "WA1_PROJECT", "WA2_PROJECT", "DSP_PROJECT"]
     },
     "deadline": {
       "type": "string",

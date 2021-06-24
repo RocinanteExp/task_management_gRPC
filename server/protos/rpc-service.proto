@@ -34,10 +34,16 @@ message CompleteTaskResponse {
 }
 
 message Task {
+    enum ProjectEnum {
+        PERSONAL = 0;
+        WA1_PROJECT = 1;
+        WA2_PROJECT = 2;
+        DSP_PROJECT = 3;
+    }
     string description = 1;
     bool important = 2;
     bool private = 3;
-    string project = 4;
+    ProjectEnum project = 4;
     string deadline = 5;
     bool completed = 6;
     repeated User assignees = 7;
@@ -59,8 +65,5 @@ message CompleteTaskRequest {
 }
 
 message User {
-    string name = 1;
-    string email = 2;
-    int32 id = 3;
-    string password = 4;
+    string email = 1;
 }

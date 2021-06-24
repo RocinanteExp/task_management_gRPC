@@ -32,5 +32,5 @@
         "description": "self link"
       }
     },
-    "required": ["name", "email"]
+    "required": ["email"]
   }
