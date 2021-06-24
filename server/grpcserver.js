@@ -78,8 +78,12 @@ function startServer() {
 
 function _sanitizeTaskMessage(taskMessage) {
     const taskMessageCopy = { ...taskMessage };
+
     if (taskMessageCopy.deadline === "") taskMessageCopy.deadline = null;
+    else taskMessageCopy.deadline = DateTime.fromISO(taskMessageCopy.deadline).toUTC().toISO();
+
     if (taskMessageCopy.project === "") taskMessageCopy.project = null;
+
     return taskMessageCopy;
 }
 
@@ -102,32 +106,24 @@ function _validateTaskMessage(taskMessage) {
 }
 
 function _validateThenSanitizeTaskMessage(message) {
-    const errors = _validateTaskMessage(message);
+    const error = _validateTaskMessage(message);
 
-    if (errors.length != 0) return { errors };
+    if (error.length != 0) return { error };
     else return { value: _sanitizeTaskMessage(message) };
 }
 
 async function _findUsers(users) {
     const promises = [];
-    const findBy = [];
-
     users.forEach((user) => {
-        if (user.id !== 0) {
-            findBy.push(user.id);
-            promises.push(userService.getUserById(user.id));
-        } else if (user.email !== "") {
-            findBy.push(user.email);
-            promises.push(userService.getUserByEmail(user.email));
-        }
+        promises.push(userService.getUserByEmail(user.email));
     });
 
     const allUsers = await Promise.all(promises);
     const usersNotFound = Array.from(allUsers, (_, idx) => idx)
         .filter((idx) => allUsers[idx] === undefined)
-        .map((idx) => findBy[idx]);
+        .map((idx) => users[idx].email);
 
-    return [allUsers, usersNotFound];
+    return { users: allUsers, usersNotFound };
 }
 
 // function sendResponse(res, success, { error, response } = {}) {
@@ -150,25 +146,25 @@ async function createTaskHandler(call, callback) {
         });
     }
 
-    const { value: taskToAdd, errors } = _validateThenSanitizeTaskMessage(call.request.task);
-    if (errors)
+    const { value: taskToAdd, error } = _validateThenSanitizeTaskMessage(call.request.task);
+    if (error)
         return callback(null, {
             success: false,
-            error: { code: _ERROR_CODES.BAD_REQUEST, message: JSON.stringify(errors) },
+            error: { code: _ERROR_CODES.BAD_REQUEST, message: JSON.stringify(error) },
         });
-
-    const [users, usersNotFound] = await _findUsers(call.request.task.assignees);
-    if (usersNotFound.length > 0)
-        return callback(null, {
-            success: false,
-            error: { code: _ERROR_CODES.ENTITY_NOT_FOUND, message: "users not found: " + usersNotFound.join(", ") },
-        });
-
-    // ignore duplicate user ids
-    const userIds = [...new Set(users.map((user) => user.id))];
 
     try {
+        const { users, usersNotFound } = await _findUsers(call.request.task.assignees);
+        if (usersNotFound.length > 0)
+            return callback(null, {
+                success: false,
+                error: { code: _ERROR_CODES.ENTITY_NOT_FOUND, message: "users not found: " + usersNotFound.join(", ") },
+            });
+
+        // ignore duplicate user ids
+        const userIds = [...new Set(users.map((user) => user.id))];
         const createdTask = await taskService.addTaskWithAssignees(taskToAdd, userIds);
+
         callback(null, { success: true, task_id: createdTask.id });
     } catch (err) {
         callback(null, {
