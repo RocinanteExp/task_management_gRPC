@@ -1,21 +1,19 @@
-package mapper;
+package service.mapper;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 import service.Task;
 import service.User;
 
+import java.util.Locale;
+
 public class TaskMapper {
     private static void setUserField(User.Builder userBuilder, String name, Object value) {
         switch (name) {
-            case "id":
-                userBuilder.setId((Integer) value);
-                break;
-            case "name":
-                userBuilder.setName((String) value);
-                break;
             case "email":
                 userBuilder.setEmail((String) value);
+                break;
+            default:
                 break;
         }
     }
@@ -32,7 +30,8 @@ public class TaskMapper {
                 taskBuilder.setPrivate((Boolean) value);
                 break;
             case "project":
-                taskBuilder.setProject((String) value);
+                String projVal = (String) value;
+                taskBuilder.setProject(Task.ProjectEnum.valueOf(projVal.toUpperCase()));
                 break;
             case "deadline":
                 taskBuilder.setDeadline((String) value);
