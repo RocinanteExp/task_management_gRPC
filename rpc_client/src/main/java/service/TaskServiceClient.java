@@ -3,13 +3,13 @@ package service;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
-import mapper.TaskMapper;
 import org.apache.commons.cli.*;
 import org.everit.json.schema.Schema;
-import org.everit.json.schema.loader.SchemaClient;
-import org.everit.json.schema.loader.SchemaLoader;
+import org.everit.json.schema.ValidationException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import service.mapper.TaskMapper;
+import service.validator.TaskValidator;
 
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -29,8 +29,8 @@ public class TaskServiceClient {
     static {
         try (InputStream inputStream = TaskServiceClient.class.getResourceAsStream("/config.properties")) {
             if (inputStream == null) {
-                System.err.println("config.properties file not found under the folder /resources");
-                System.exit(-10);
+                System.err.println("config.properties file missing. Check the resources folder");
+                System.exit(-1);
             }
             Properties props = new Properties();
             props.load(inputStream);
@@ -40,8 +40,8 @@ public class TaskServiceClient {
             PORT = Integer.parseInt(props.getProperty("grpcserver.port"));
             CERTIFICATE_PATH = "/" + props.getProperty("grpcserver.certificate");
         } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(-10);
+            System.err.println(e.getMessage());
+            System.exit(-2);
         }
     }
 
@@ -67,16 +67,15 @@ public class TaskServiceClient {
         } catch (ParseException e) {
             System.err.println(e.getMessage());
             formatter.printHelp("java -jar <jar file>", options);
-            System.exit(-1);
+            System.exit(-3);
         }
 
         return cmd;
     }
 
-
     public static ManagedChannel getChannel() throws IOException {
         try (InputStream inputStream = TaskServiceClient.class.getResourceAsStream(CERTIFICATE_PATH)) {
-            if (inputStream == null) throw new FileNotFoundException("certificate " + CERTIFICATE_PATH + " not found");
+            if (inputStream == null) throw new FileNotFoundException("certificate " + CERTIFICATE_PATH + " missing. Check the resources folder.");
             return NettyChannelBuilder
                     .forAddress(HOST, PORT)
                     .sslContext(GrpcSslContexts.forClient().trustManager(inputStream).build())
@@ -84,36 +83,17 @@ public class TaskServiceClient {
         }
     }
 
-    public static Schema loadTaskSchema() throws IOException {
-        try (InputStream inputStream = TaskServiceClient.class.getResourceAsStream(TASK_SCHEMA_PATH)) {
-            if (inputStream == null) throw new FileNotFoundException("task schema " + TASK_SCHEMA_PATH + " not found");
-            JSONObject jsonSchema = new JSONObject(new JSONTokener(inputStream));
-
-            return SchemaLoader
-                    .builder()
-                    .schemaClient(SchemaClient.classPathAwareClient())
-                    .schemaJson(jsonSchema)
-                    .resolutionScope("classpath:///")
-                    .build()
-                    .load()
-                    .build();
-        }
-    }
-
-    public static void validateJsonAgainstSchema(Schema schema, JSONObject jsonSubject) {
-        schema.validate(jsonSubject);
-    }
-
     // convert the json file "path" to a JSONObject
     // it will throw an error if the json does not pass the validation against the default task schema
     public static JSONObject getTaskJSONObject(String path) throws IOException {
         JSONObject jsonSubject = new JSONObject(new JSONTokener(new FileReader(path)));
-        Schema schema = loadTaskSchema();
-        validateJsonAgainstSchema(schema, jsonSubject);
+        Schema schema = TaskValidator.loadTaskSchema(TASK_SCHEMA_PATH);
+        TaskValidator.validateJsonAgainstSchema(schema, jsonSubject);
         return jsonSubject;
     }
 
     public static void main(String[] args) {
+        int exitStatusCode = 0;
         CommandLine cmd = parseArgs(args);
 
         ManagedChannel channel = null;
@@ -153,22 +133,26 @@ public class TaskServiceClient {
             }
         } catch (FileNotFoundException e) {
             System.err.println(e.getMessage());
-            System.exit(2);
+            exitStatusCode = 2;
         } catch (NumberFormatException e) {
             System.err.println(e.getMessage());
-            System.exit(3);
+            exitStatusCode = 3;
+        } catch (ValidationException e) {
+            System.err.println("failed validation against schema");
+            System.err.println(e.getMessage());
+            exitStatusCode = 4;
         } catch (Throwable e) {
             if (e.getMessage().contains("io exception"))
                 System.err.println("could not connect to " + HOST + ":" + PORT + " (probably because the grpc server is offline)");
             else System.err.println(e.getMessage());
-            System.exit(4);
+            exitStatusCode = 5;
         } finally {
             try {
                 if (channel != null) channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+                System.exit(exitStatusCode);
             } catch (InterruptedException e) {
-                e.printStackTrace();
                 System.err.println(e.getMessage());
-                System.exit(5);
+                System.exit(6);
             }
         }
     }
