@@ -1,7 +1,7 @@
 "use strict";
 
 var utils = require("../utils/writer.js");
-var Users = require("../service/UsersService");
+var userService = require("../service/UsersService");
 var WebSocket = require("../components/websocket");
 var WSMessage = require("../components/ws_message.js");
 var jsonwebtoken = require("jsonwebtoken");
@@ -15,25 +15,8 @@ const _ERR_CODES = {
     INVALID_QUERY_PARAM: 3,
 };
 
-async function autheticateUserWithEmailAndPassword(
-    email,
-    password
-) {
-    const user = await Users.getUserByEmail(email);
-    if (user === undefined) {
-        return { success: false, errCode: _ERR_CODES.INVALID_EMAIL };
-    }
-
-    if (!Users.checkPassword(user, password)) {
-        return { success: false, errCode: _ERR_CODES.INVALID_PASSWORD };
-    }
-
-    return { success: true, value: user };
-};
-module.exports.authenticateUserWithEmailAndPassword = autheticateUserWithEmailAndPassword
-
-function writeResponse(res, errCode) {
-    switch (errCode) {
+function _writeResponse(res, errorCode) {
+    switch (errorCode) {
         case _ERR_CODES.INVALID_EMAIL:
             utils.writeJson(res, { errors: [{ param: "Server", msg: "Invalid e-mail" }] }, 404);
             break;
@@ -50,26 +33,42 @@ function writeResponse(res, errCode) {
     }
 }
 
-module.exports.authenticateUser = async function authenticateUser(req, res, next) {
+async function autheticateUserWithEmailAndPassword(email, password) {
+    const user = await userService.getUserByEmail(email);
+    if (user === undefined) {
+        return { success: false, errorCode: _ERR_CODES.INVALID_EMAIL };
+    }
+
+    if (!userService.checkPassword(user, password)) {
+        return { success: false, errorCode: _ERR_CODES.INVALID_PASSWORD };
+    }
+
+    return { success: true, value: user };
+}
+module.exports.authenticateUserWithEmailAndPassword = autheticateUserWithEmailAndPassword;
+
+module.exports.authenticateUser = async function authenticateUser(req, res, _next) {
     if (req.query.type == "login") {
         try {
             const email = req.body.email;
             const password = req.body.password;
-            const { success, value, errCode } = await autheticateUserWithEmailAndPassword(email, password);
+            const { success, value, errorCode } = await autheticateUserWithEmailAndPassword(email, password);
 
-            console.log("sono qui")
-            console.log(success)
-            console.log(value)
+            console.log("sono qui");
+            console.log(success);
+            console.log(value);
             if (!success) {
-                writeResponse(res, errCode);
+                _writeResponse(res, errorCode);
             } else {
                 const user = value;
                 //notify all the clients that a user has logged in the service
-                Users.getActiveTaskUser(user.id).then((task) => {
+                userService.getActiveTaskUser(user.id).then((task) => {
                     var loginMessage;
-                    if (task == undefined)
+                    if (task == undefined) {
                         loginMessage = new WSMessage("login", user.id, user.name, undefined, undefined);
-                    else loginMessage = new WSMessage("login", user.id, user.name, task.id, task.description);
+                    } else {
+                        loginMessage = new WSMessage("login", user.id, user.name, task.id, task.description);
+                    }
 
                     WebSocket.sendAllClients(loginMessage);
                     WebSocket.saveMessage(user.id, loginMessage);
@@ -85,8 +84,8 @@ module.exports.authenticateUser = async function authenticateUser(req, res, next
             }).then(() => res.status(401).json(authErrorObj));
         }
     } else if (req.query.type == "logout") {
-        const user = await Users.getUserByEmail(req.body.email);
-        if (user === undefined) writeResponse(res, _ERR_CODES.INVALID_EMAIL);
+        const user = await userService.getUserByEmail(req.body.email);
+        if (user === undefined) _writeResponse(res, _ERR_CODES.INVALID_EMAIL);
         else {
             //notify all clients that a user has logged out from the service
             var logoutMessage = new WSMessage("logout", user.id, user.name);
@@ -96,12 +95,13 @@ module.exports.authenticateUser = async function authenticateUser(req, res, next
             res.clearCookie("token").end();
         }
     } else {
-        writeResponse(res, _ERR_CODES.INVALID_QUERY_PARAM);
+        _writeResponse(res, _ERR_CODES.INVALID_QUERY_PARAM);
     }
 };
 
-module.exports.getUsers = function getUsers(req, res, next) {
-    Users.getUsers()
+module.exports.getUsers = function getUsers(_req, res, _next) {
+    userService
+        .getUsers()
         .then(function (response) {
             utils.writeJson(res, response);
         })
@@ -110,8 +110,9 @@ module.exports.getUsers = function getUsers(req, res, next) {
         });
 };
 
-module.exports.getSingleUser = function getSingleUser(req, res, next) {
-    Users.getSingleUser(req.params.userId)
+module.exports.getSingleUser = function getSingleUser(req, res, _next) {
+    userService
+        .getSingleUser(req.params.userId)
         .then(function (response) {
             if (!response) {
                 utils.writeJson(res, response, 404);
