@@ -1,6 +1,5 @@
 "use strict";
 
-const { setLogger } = require("@grpc/grpc-js/build/src/logging");
 const db = require("../components/db");
 // const moment = require("moment");
 const Task = require("../components/task");
@@ -29,7 +28,7 @@ function addTaskWithAssignees(task, userIds) {
             }
         });
     });
-};
+}
 exports.addTaskWithAssignees = addTaskWithAssignees;
 
 /**
@@ -40,31 +39,35 @@ exports.addTaskWithAssignees = addTaskWithAssignees;
  **/
 function addTask(task) {
     return new Promise((resolve, reject) => {
-        const sql =
-            "INSERT INTO tasks(description, important, private, project, deadline, completed) VALUES(?,?,?,?,?,?)";
-        db.run(
-            sql,
-            [task.description, task.important, task.private, task.project, task.deadline, task.completed],
-            function (err) {
-                if (err) {
-                    console.log(err);
-                    reject(err);
-                } else {
-                    const createdTask = new Task(
-                        this.lastID,
-                        task.description,
-                        task.important,
-                        task.private,
-                        task.deadline,
-                        task.project,
-                        task.completed
-                    );
-                    resolve(createdTask);
-                }
+        let sqlBuilder = "INSERT INTO tasks(description, project, deadline";
+        const params = [task.description, task.project, task.deadline];
+        if (task.important !== undefined) {
+            sqlBuilder += ", important";
+            params.push(task.important);
+        }
+        if (task.private !== undefined) {
+            sqlBuilder += ", private";
+            params.push(task.private);
+        }
+        if (task.completed !== undefined) {
+            sqlBuilder += ", completed";
+            params.push(task.completed);
+        }
+
+        sqlBuilder += ") VALUES(" + params.map((_) => "?").join(",") + ")";
+
+        db.run(sqlBuilder, params, function (err) {
+            if (err) {
+                console.log(err);
+                reject(err);
+            } else {
+                getSingleTask(this.lastID)
+                    .then((task) => resolve(task))
+                    .catch((err) => reject(err));
             }
-        );
+        });
     });
-};
+}
 exports.addTask = addTask;
 
 /**
@@ -136,7 +139,8 @@ exports.getPublicTasksTotal = function () {
  * taskId Long ID of the task to retrieve
  * returns List
  **/
-exports.getSingleTask = function (taskId) {
+function getSingleTask(taskId) {
+    // exports.getSingleTask = function (taskId) {
     return new Promise((resolve, reject) => {
         const sql =
             "SELECT id as tid, description, important, private, project, deadline, completed FROM tasks WHERE id = ?";
@@ -149,7 +153,8 @@ exports.getSingleTask = function (taskId) {
             }
         });
     });
-};
+}
+exports.getSingleTask = getSingleTask;
 
 /**
  * Retreve the tasks of the user
@@ -261,9 +266,8 @@ exports.updateSingleTask = function (task, taskId) {
         }
 
         builder.where("id", taskId);
-        const { query, params } = builder.build();
 
-        console.log("query", query);
+        const { query, params } = builder.build();
         if (query === "") resolve();
 
         db.run(query, params, function (err) {
