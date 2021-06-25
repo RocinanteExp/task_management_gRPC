@@ -28,7 +28,7 @@ exports.existsUserById = function (id) {
         const sql = "SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)";
         db.all(sql, [id], (err, rows) => {
             if (err) reject(err);
-            else resolve(rows)
+            else resolve(rows);
         });
     });
 };
@@ -38,11 +38,10 @@ exports.existsUserByEmail = function (email) {
         const sql = "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)";
         db.all(sql, [email], (err, rows) => {
             if (err) reject(err);
-            else resolve(rows)
+            else resolve(rows);
         });
     });
 };
-
 
 exports.getUserById = function (id) {
     return new Promise((resolve, reject) => {
