@@ -54,10 +54,6 @@ public class TaskMapper {
 
     public static Task fromJSONObjToTaskMessage(JSONObject jsonObj) {
         Task.Builder taskBuilder = Task.newBuilder();
-        // set manually the default value of private in case the field private is missing
-        if (!jsonObj.has("private")) {
-            jsonObj.put("private", true);
-        }
         jsonObj.keySet().forEach(keyStr -> setTaskField(taskBuilder, keyStr, jsonObj.get(keyStr)));
         return taskBuilder.build();
     }

@@ -18,6 +18,7 @@ public class TaskValidator {
 
             return SchemaLoader
                     .builder()
+                    .useDefaults(true)
                     .schemaClient(SchemaClient.classPathAwareClient())
                     .schemaJson(jsonSchema)
                     .resolutionScope("classpath:///")

@@ -89,6 +89,7 @@ public class TaskServiceClient {
     // it will throw an error if the json does not pass the validation against the default task schema
     public static JSONObject getTaskJSONObject(String path) throws IOException {
         JSONObject jsonSubject = new JSONObject(new JSONTokener(new FileReader(path)));
+        if (jsonSubject.has("project")) jsonSubject.put("project", ((String) jsonSubject.get("project")).toUpperCase());
         Schema schema = TaskValidator.loadTaskSchema(TASK_SCHEMA_PATH);
         TaskValidator.validateJsonAgainstSchema(schema, jsonSubject);
         return jsonSubject;
