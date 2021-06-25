@@ -1,13 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "/task_schema.json",
   "title": "Task",
   "description": "JSON Schema for Task objects",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "$schema": {
-        "type": "string",
-        "description": "path to the JSON Schema to use for the validation of the JSOn file describing the task"
+      "type": "string",
+      "description": "path to the JSON Schema to use for the validation of the JSOn file describing the task"
     },
     "id": {
       "type": "integer",
@@ -20,12 +21,12 @@
     "important": {
       "type": "boolean",
       "description": "this property is set to true if the task is marked as important, false otherwise (default value: false)",
-      "default": "false"
+      "default": false
     },
     "private": {
       "type": "boolean",
       "description": "this property is set to true if the task is marked as private, false if the task is shared (default value: true)",
-      "default": "true"
+      "default": true
     },
     "project": {
       "type": "string",
@@ -41,12 +42,12 @@
     "completed": {
       "type": "boolean",
       "description": "this property is set to true if the task is marked as completed, false otherwise (default value: false)",
-      "default": "false"
+      "default": false
     },
     "assignees": {
       "type": "array",
       "items": {
-          "$ref": "./user_schema.json#"
+        "$ref": "./user_schema.json#"
       }
     },
     "self": {
