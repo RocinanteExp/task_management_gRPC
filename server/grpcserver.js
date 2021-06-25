@@ -126,11 +126,6 @@ async function _findUsers(users) {
     return { users: allUsers, usersNotFound };
 }
 
-// function sendResponse(res, success, { error, response } = {}) {
-//     if (success) res(null, { success, ...response });
-//     else return res(null, { success, error });
-// }
-
 async function createTaskHandler(call, callback) {
     console.log("grpc server: received request for createTaskHandler");
     console.log(call.request);
