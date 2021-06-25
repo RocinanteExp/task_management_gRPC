@@ -118,7 +118,7 @@ public class TaskServiceClient {
                 if (!response.getSuccess()) {
                     System.out.println("message: " + response.getError().getMessage());
                 } else {
-                    System.out.println("task has id: " + response.getTaskId());
+                    System.out.println("the newly created task has id " + response.getTaskId());
                 }
             } else if (cmd.hasOption("f")) {
                 int taskId = Integer.parseInt(cmd.getOptionValue("f"));
