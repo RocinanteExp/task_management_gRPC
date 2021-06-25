@@ -75,7 +75,9 @@ public class TaskServiceClient {
 
     public static ManagedChannel getChannel() throws IOException {
         try (InputStream inputStream = TaskServiceClient.class.getResourceAsStream(CERTIFICATE_PATH)) {
-            if (inputStream == null) throw new FileNotFoundException("certificate " + CERTIFICATE_PATH + " missing. Check the resources folder.");
+            if (inputStream == null) {
+                throw new FileNotFoundException("certificate " + CERTIFICATE_PATH + " missing. Check the resources folder.");
+            }
             return NettyChannelBuilder
                     .forAddress(HOST, PORT)
                     .sslContext(GrpcSslContexts.forClient().trustManager(inputStream).build())
