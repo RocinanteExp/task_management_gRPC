@@ -56,10 +56,15 @@ app.use(
 );
 
 app.get("/api/tasks", taskController.getUserTasks);
-app.post("/api/tasks", validate({ body: schemas.taskSchema }), taskController.addTask);
+app.post("/api/tasks", _toUpperCaseEnum, validate({ body: schemas.taskSchema }), taskController.addTask);
 app.get("/api/tasks/:taskId", taskController.getSingleTask);
 app.delete("/api/tasks/:taskId", taskController.deleteTask);
-app.put("/api/tasks/:taskId", validate({ body: schemas.taskSchema }), taskController.updateSingleTask);
+app.put(
+    "/api/tasks/:taskId",
+    _toUpperCaseEnum,
+    validate({ body: schemas.taskSchema }),
+    taskController.updateSingleTask
+);
 app.post("/api/tasks/:taskId/assignees", validate({ body: schemas.userSchema }), assignmentController.assignTaskToUser);
 app.get("/api/tasks/:taskId/assignees", assignmentController.getUsersAssigned);
 app.delete("/api/tasks/:taskId/assignees/:userId", assignmentController.removeUser);
@@ -68,8 +73,16 @@ app.get("/api/users", userController.getUsers);
 app.get("/api/users/:userId", userController.getSingleUser);
 app.put("/api/users/:userId/selection", assignmentController.selectTask);
 
-// Error handlers for validation and authentication errors
+// utility function to transform enum strings to uppercased strings
+function _toUpperCaseEnum(req, _res, next) {
+    const project = req.body.project;
+    if (project !== undefined && (typeof project === "string" || project instanceof String)) {
+        req.body.project = project.toUpperCase();
+    }
+    next();
+}
 
+// Error handlers for validation and authentication errors
 app.use(function (err, _req, res, next) {
     if (err instanceof ValidationError) {
         res.status(400).send(err);
