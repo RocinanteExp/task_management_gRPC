@@ -51,7 +51,6 @@ function _getServer(path) {
  */
 function startServer() {
     const server = _getServer(PROTO_PATH);
-    console.log(__dirname);
     const hostname = `${config.grpc.host}:${config.grpc.port}`;
     const credentials = grpc.ServerCredentials.createSsl(
         null,
