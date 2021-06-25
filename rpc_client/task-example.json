@@ -1,0 +1,16 @@
+{
+    "description": "I am a task created using grpc",
+    "deadline": "2021-06-25T00:00:00Z",
+    "important": false,
+    "private": true,
+    "completed": false,
+    "project": "wa2_project",
+    "assignees": [
+        {
+            "email": "a@a.it"
+        },
+        {
+            "email": "b@b.it"
+        }
+    ]
+}
