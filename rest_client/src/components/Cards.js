@@ -1,20 +1,20 @@
-import React from 'react';
+import React from "react";
 import { Card } from "semantic-ui-react";
 
-
-
 const Cards = (props) => {
-   const {id, name, selectedInfo} = props;
+    const { id, name, selectedInfo } = props;
     return (
-      <Card>
-      <Card.Content header={"User Name: " +name} />
-      <Card.Content description={"UsedID: " + id}/>
-      <Card.Content extra>
-      {selectedInfo.taskId ? "Task Selected: "+selectedInfo.taskId+" "+ selectedInfo.taskName : 'Task not selected'}
-      </Card.Content>
-    </Card>
+        <Card>
+            <Card.Content header={"User Name: " + name} />
+            <Card.Content description={"UsedID: " + id} />
+            <Card.Content extra>
+                {selectedInfo.taskId
+                    ? "Task Selected: " + selectedInfo.taskId + " " + selectedInfo.taskName
+                    : "Task not selected"}
+            </Card.Content>
+        </Card>
     );
-}
+};
 
 // TODO: Switch to https://github.com/palmerhq/the-platform#stylesheet when it will be stable
 const styleLink = document.createElement("link");
@@ -23,3 +23,4 @@ styleLink.href = "https://cdn.jsdelivr.net/npm/semantic-ui/dist/semantic.min.css
 document.head.appendChild(styleLink);
 
 export default Cards;
+
